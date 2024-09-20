@@ -10,8 +10,10 @@ import { z } from "zod";
 import { getIronSession } from "iron-session";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import getSession from "@/lib/session";
 
 const checkUsername = (username: string) => !username.includes("potato");
+
 const checkPasswords = ({
   password,
   confirm_password,
@@ -19,7 +21,6 @@ const checkPasswords = ({
   password: string;
   confirm_password: string;
 }) => password === confirm_password;
-
 const checkUniqueUsername = async (username: string) => {
   const user = await db.user.findUnique({
     where: {
@@ -36,7 +37,6 @@ const checkUniqueUsername = async (username: string) => {
   // }
   return !Boolean(user);
 };
-
 const checkUniqueEmail = async (email: string) => {
   const user = await db.user.findUnique({
     where: {
@@ -48,7 +48,6 @@ const checkUniqueEmail = async (email: string) => {
   });
   return Boolean(user) === false;
 };
-
 const formSchema = z
   .object({
     username: z
@@ -77,6 +76,7 @@ const formSchema = z
     message: "Both passwords should be the same!",
     path: ["confirm_password"],
   });
+
 export async function createAccount(prevState: any, formData: FormData) {
   const data = {
     username: formData.get("username"),
@@ -84,7 +84,7 @@ export async function createAccount(prevState: any, formData: FormData) {
     password: formData.get("password"),
     confirm_password: formData.get("confirm_password"),
   };
-  const result = await formSchema.safeParseAsync(data);
+  const result = await formSchema.spa(data);
   if (!result.success) {
     return result.error.flatten();
   } else {
@@ -99,14 +99,9 @@ export async function createAccount(prevState: any, formData: FormData) {
         id: true,
       },
     });
-    // log the user in
-    const cookie = await getIronSession(cookies(), {
-      cookieName: "delicious-karrot",
-      password: process.env.COOKIE_PASSWORD!,
-    });
-    // @ts-ignore
-    cookie.id = user.id;
-    await cookie.save();
+    const session = await getSession();
+    session.id = user.id;
+    await session.save();
     redirect("/profile");
   }
 }
